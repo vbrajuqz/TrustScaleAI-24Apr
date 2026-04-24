@@ -1,0 +1,12 @@
+# Railway Nixpacks config — forces Node 20 and builds with npm
+[phases.setup]
+nixPkgs = ["nodejs_20", "openssl"]
+
+[phases.install]
+cmds = ["npm ci --include=dev || npm install --include=dev"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run db:migrate && npm run start"

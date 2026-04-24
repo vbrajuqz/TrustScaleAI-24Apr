@@ -1,0 +1,4 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: "Inter", system-ui, sans-serif; background: #F7FAFC; color: #1A202C; }
+a { color: inherit; text-decoration: none; }

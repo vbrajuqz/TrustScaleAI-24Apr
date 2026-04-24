@@ -1,0 +1,123 @@
+// TrustScaleAI Companion — Prisma schema
+// Minimal relational model for Auth.js session storage + real Engagement/Stakeholder domain.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/* ========== Auth.js tables (PrismaAdapter) ========== */
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          String    @default("user")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  engagements   Engagement[]  @relation("EngagementCreator")
+  stakeholders  Stakeholder[] @relation("StakeholderCreator")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/* ========== TrustScaleAI domain — real-backed features ========== */
+
+model Engagement {
+  id          String    @id @default(cuid())
+  code        String    @unique                     // ENG-2026-RB-001
+  client      String
+  industry    String?
+  variant     String?                               // "Variant B · 4-Week Board-Ready"
+  phase       Int       @default(1)                 // 1..4
+  phaseName   String?                               // "Scope & Frame" etc.
+  status      String    @default("In flight")       // In flight / On hold / Trial / Closed
+  progress    Int       @default(0)                 // 0..100
+  sponsor     String?
+  delivery    String?
+  nextGate    String?                               // G1 / G2 / G3 / G4
+  startDate   DateTime?
+  targetDate  DateTime?
+  region      String?   @default("EU-Central")
+  notes       String?   @db.Text
+
+  createdById String
+  createdBy   User      @relation("EngagementCreator", fields: [createdById], references: [id])
+
+  stakeholders Stakeholder[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([createdById])
+}
+
+model Stakeholder {
+  id           String     @id @default(cuid())
+  engagementId String
+  engagement   Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+
+  fullName     String
+  email        String
+  organization String                              // Regio Bank, QualiZeal, etc.
+  role         String                              // Executive Sponsor, CISO, etc.
+  influence    String     @default("High")        // High / Medium / Low
+  interest     String     @default("High")        // High / Medium / Low
+  side         String     @default("Client")      // Client / Delivery / Observer
+  phone        String?
+  notes        String?    @db.Text
+
+  createdById  String
+  createdBy    User       @relation("StakeholderCreator", fields: [createdById], references: [id])
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([engagementId])
+  @@index([createdById])
+}
