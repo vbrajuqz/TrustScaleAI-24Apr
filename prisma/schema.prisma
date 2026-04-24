@@ -10,7 +10,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* ========== Auth.js tables (PrismaAdapter) ========== */
+// ========== Auth.js tables (PrismaAdapter) ========== //
 
 model Account {
   id                String  @id @default(cuid())
@@ -66,7 +66,7 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-/* ========== TrustScaleAI domain — real-backed features ========== */
+// ========== TrustScaleAI domain — real-backed features ========== //
 
 model Engagement {
   id          String    @id @default(cuid())
