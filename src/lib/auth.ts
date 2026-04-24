@@ -6,7 +6,7 @@ import prisma from "./prisma";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "database" },
+  session: { strategy: "jwt" },
   trustHost: true,
   pages: { signIn: "/signin" },
   providers: [
@@ -17,15 +17,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     MicrosoftEntraID({
       clientId: process.env.AZURE_AD_CLIENT_ID,
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
-      // "common" = any Microsoft identity (personal + work); use a tenant GUID to restrict
       issuer: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID || "common"}/v2.0`,
     }),
   ],
   callbacks: {
-    async session({ session, user }) {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = (user as { role?: string }).role ?? "user";
+      }
+      return token;
+    },
+    async session({ session, token }) {
       if (session.user) {
-        (session.user as { id?: string }).id = user.id;
-        (session.user as { role?: string }).role = (user as { role?: string }).role ?? "user";
+        (session.user as { id?: string }).id = token.id as string;
+        (session.user as { role?: string }).role = token.role as string;
       }
       return session;
     },
