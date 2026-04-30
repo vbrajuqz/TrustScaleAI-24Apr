@@ -1,15 +1,16 @@
 // TrustScaleAI Companion — Full data model
-// Aligned with Data Model document v1, TrustScaleAI Participant Guide, Templates doc 12-Mar-2026.
-// All catalog values are seeded from authoritative sources only — see prisma/seed.ts.
+// Source: Data Model document, Participant Guide, Templates 12-Mar-2026.
 
-generator client { provider = "prisma-client-js" }
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-/* ---------- Auth.js tables (PrismaAdapter) ---------- */
+// ---------- Auth.js tables (PrismaAdapter) ---------- 
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -44,7 +45,7 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-/* ---------- Identity & Access ---------- */
+// ---------- Identity & Access ---------- 
 model Organization {
   id           String   @id @default(cuid())
   name         String
@@ -111,7 +112,7 @@ model Invitation {
   invitedById     String
 }
 
-/* ---------- Engagement Core ---------- */
+// ---------- Engagement Core ---------- 
 model EngagementVariant {
   code           String   @id   // VA / VB / VC
   label          String         // "Variant A · 2-Week Fast Start" etc
@@ -217,7 +218,7 @@ model TeamMember {
   @@index([engagementId])
 }
 
-/* ---------- Method Catalog (read-only from admin) ---------- */
+// ---------- Method Catalog (read-only from admin) ---------- 
 model MethodTemplate {
   code      String  @id          // T-A1 ... T-G3
   folder    String                // A | B | C | D | E | F | G
