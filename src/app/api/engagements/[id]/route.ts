@@ -7,7 +7,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!session?.user?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const eng = await prisma.engagement.findUnique({
     where: { id: params.id },
-    include: { stakeholders: true },
+    include: {
+      organization: true,
+      variant: true,
+      sponsorUser: true,
+      deliveryLeadUser: true,
+      vfrWeight: true,
+      stakeholders: true,
+    },
   });
   if (!eng) return NextResponse.json({ error: "not_found" }, { status: 404 });
   return NextResponse.json(eng);

@@ -513,3 +513,57 @@ If you're done with the demo and want to stop being billed:
 ---
 
 © QualiZeal — TrustScaleAI Companion reference implementation.
+
+
+---
+
+# Appendix — V2 Update: Admin Module + Master Data
+
+This iteration brings the application into full alignment with the Data Model document and the TrustScaleAI Participant Guide.
+
+## Bootstrap administrator
+
+`balaramaraju.vatsavai@qualizeal.com` is the seeded **Platform Administrator**. The first sign-in (via Microsoft or Google SSO) auto-promotes this email to `platformRoleCode = "PA"`. From there, additional users can be granted any of the 11 catalog roles via Admin → Users.
+
+## Master data catalogs (read-only or admin-managed)
+
+| Catalog | Source | Rows |
+|---|---|---|
+| Roles | Participant Guide Chapter 6 | 11 |
+| Engagement Variants | Participant Guide §4.8 / §4.9 / §4.10 | 3 (VA / VB / VC) |
+| Method Templates | TrustScaleAI Templates — 12 Mar 2026 | 35 |
+| Organizations | Created by Platform Admin | dynamic |
+| Users | Created/invited by Platform Admin | dynamic |
+
+All values are seeded **verbatim** from the authoritative documents. No hallucination.
+
+## Admin module routes
+
+- `/admin` — overview dashboard (counts of orgs, users, engagements, catalogs)
+- `/admin/organizations` — CRUD organizations (name, type, domain, plan, status, region, seats)
+- `/admin/users` — CRUD users + inline role assignment to any of 11 catalog roles
+- `/admin/roles` — read-only roles catalog
+- `/admin/variants` — read-only variants catalog
+- `/admin/templates` — read-only 35-template catalog grouped by folder
+
+## Create Engagement — master-data driven
+
+The Create Engagement form is now bound to master data:
+
+- **Organization** dropdown filtered to `type != Platform` (clients/partners only)
+- **Variant** dropdown lists VA / VB / VC from the catalog
+- **Sponsor** dropdown filtered to users in the selected client organization
+- **Delivery lead** dropdown filtered to users in the QualiZeal Platform organization
+- **VFRWeight** is auto-created with one of four documented presets (Default 40/35/25, Regulated 35/35/30, Innovation 45/40/15, Execution 30/50/20)
+- The Engagement Lead can fine-tune weights post-creation via the V×F×R panel on the Engagement detail page (locks at G1 pass per Participant Guide §8.12)
+
+## Add Stakeholder — data-model fields
+
+The Add Stakeholder form mirrors data model entity #10 exactly:
+
+- `function` enum: Risk / Compliance / Operations / Data / IT / Finance / Business
+- `influence` / `interest`: High / Medium / Low
+- `side`: Client / Delivery / Observer
+- `riskLevel`: Low / Medium / High
+- `dataOwner`: boolean — controls access to raw evidence
+

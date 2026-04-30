@@ -1,17 +1,15 @@
-// TrustScaleAI Companion — Prisma schema
-// Minimal relational model for Auth.js session storage + real Engagement/Stakeholder domain.
+// TrustScaleAI Companion — Full data model
+// Aligned with Data Model document v1, TrustScaleAI Participant Guide, Templates doc 12-Mar-2026.
+// All catalog values are seeded from authoritative sources only — see prisma/seed.ts.
 
-generator client {
-  provider = "prisma-client-js"
-}
+generator client { provider = "prisma-client-js" }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// ========== Auth.js tables (PrismaAdapter) ========== //
-
+/* ---------- Auth.js tables (PrismaAdapter) ---------- */
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -25,9 +23,7 @@ model Account {
   scope             String?
   id_token          String? @db.Text
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([provider, providerAccountId])
   @@index([userId])
 }
@@ -38,86 +34,195 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@index([userId])
-}
-
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  role          String    @default("user")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  accounts      Account[]
-  sessions      Session[]
-  engagements   Engagement[]  @relation("EngagementCreator")
-  stakeholders  Stakeholder[] @relation("StakeholderCreator")
 }
 
 model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-
   @@unique([identifier, token])
 }
 
-// ========== TrustScaleAI domain — real-backed features ========== //
+/* ---------- Identity & Access ---------- */
+model Organization {
+  id           String   @id @default(cuid())
+  name         String
+  type         String   // Platform | Client | Partner
+  domain       String   @unique
+  plan         String   @default("Trial")          // Trial | Advisory | Enterprise
+  status       String   @default("Provisioning")   // Active | Trial | Provisioning | Suspended
+  region       String   @default("EU-Central")     // EU-Central | EU-West | US-East | APAC-SG
+  seats        Int      @default(10)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users        User[]
+  engagements  Engagement[]
+  invitations  Invitation[]
+}
+
+model User {
+  id              String    @id @default(cuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  name            String?
+  email           String?   @unique
+  emailVerified   DateTime?
+  image           String?
+  initials        String?
+  mfa             Boolean   @default(false)
+  status          String    @default("Active")   // Active | Invited | Pending | Deactivated
+  // Single platform-wide role for simple MVP. Engagement-level roles in TeamMember.
+  platformRoleCode String   @default("ST")        // PA / EL / SC / EA / RG / QE / BA / PMO / AI / ES / ST
+  lastLogin       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+
+  engagementsCreated Engagement[]   @relation("EngagementCreator")
+  engagementsAsSponsor  Engagement[] @relation("EngagementSponsor")
+  engagementsAsDelivery Engagement[] @relation("EngagementDeliveryLead")
+  stakeholdersCreated Stakeholder[] @relation("StakeholderCreator")
+  teamMemberships    TeamMember[]
+}
+
+model Role {
+  code        String  @id   // PA / EL / SC / EA / RG / QE / BA / PMO / AI / ES / ST
+  name        String
+  orgScope    String        // Any | Own
+  description String  @db.Text
+  permissions String[]
+}
+
+model Invitation {
+  id              String   @id @default(cuid())
+  email           String
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  roleCode        String       // FK → Role.code (string ref to keep simple)
+  token           String       @unique
+  status          String       @default("Sent")
+  sentAt          DateTime     @default(now())
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  invitedById     String
+}
+
+/* ---------- Engagement Core ---------- */
+model EngagementVariant {
+  code           String   @id   // VA / VB / VC
+  label          String         // "Variant A · 2-Week Fast Start" etc
+  durationWeeks  Int
+  description    String   @db.Text
+  templateCodes  String[]       // template codes required for this variant
+  gateCodes      String[]       // gate slugs (subset)
+  isManaged      Boolean  @default(true)
+
+  engagements    Engagement[]
+}
 
 model Engagement {
-  id          String    @id @default(cuid())
-  code        String    @unique                     // ENG-2026-RB-001
-  client      String
-  industry    String?
-  variant     String?                               // "Variant B · 4-Week Board-Ready"
-  phase       Int       @default(1)                 // 1..4
-  phaseName   String?                               // "Scope & Frame" etc.
-  status      String    @default("In flight")       // In flight / On hold / Trial / Closed
-  progress    Int       @default(0)                 // 0..100
-  sponsor     String?
-  delivery    String?
-  nextGate    String?                               // G1 / G2 / G3 / G4
-  startDate   DateTime?
-  targetDate  DateTime?
-  region      String?   @default("EU-Central")
-  notes       String?   @db.Text
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  client              String        // denormalized
+  industry            String?
+  variantCode         String
+  variant             EngagementVariant @relation(fields: [variantCode], references: [code])
+  phase               Int      @default(1)
+  phaseName           String?
+  nextGate            String?       // G1..G4 or null
+  status              String   @default("In flight")  // In flight | On hold | Trial | Closed
+  progress            Int      @default(0)            // 0..100
+  region              String   @default("EU-Central")
 
-  createdById String
-  createdBy   User      @relation("EngagementCreator", fields: [createdById], references: [id])
+  sponsorUserId       String?
+  sponsorUser         User?         @relation("EngagementSponsor", fields: [sponsorUserId], references: [id])
+  deliveryLeadUserId  String?
+  deliveryLeadUser    User?         @relation("EngagementDeliveryLead", fields: [deliveryLeadUserId], references: [id])
 
-  stakeholders Stakeholder[]
+  startDate           DateTime?
+  targetDate          DateTime?
+  notes               String?  @db.Text
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdById         String
+  createdBy           User     @relation("EngagementCreator", fields: [createdById], references: [id])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  @@index([createdById])
+  vfrWeight           VFRWeight?
+  stakeholders        Stakeholder[]
+  team                TeamMember[]
+}
+
+model VFRWeight {
+  id                          String     @id @default(cuid())
+  engagementId                String     @unique
+  engagement                  Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  // Defaults from Participant Guide §8.12: V=40%, F=35%, R=25%
+  valueWeight                 Decimal    @default(0.400) @db.Decimal(4,3)
+  feasibilityWeight           Decimal    @default(0.350) @db.Decimal(4,3)
+  riskAttractivenessWeight    Decimal    @default(0.250) @db.Decimal(4,3)
+  context                     String     @default("Default") // Default | Regulated | Innovation | Execution
+  rationale                   String?    @db.Text
+  lockedAt                    DateTime?
+  lockedById                  String?
+  updatedById                 String
+  createdAt                   DateTime   @default(now())
+  updatedAt                   DateTime   @updatedAt
 }
 
 model Stakeholder {
-  id           String     @id @default(cuid())
-  engagementId String
-  engagement   Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  id            String     @id @default(cuid())
+  engagementId  String
+  engagement    Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  fullName      String
+  email         String
+  phone         String?
+  organization  String
+  role          String                                     // free-text — e.g. "Executive Sponsor", "CISO"
+  function      String                                      // Risk | Compliance | Operations | Data | IT | Finance | Business
+  influence     String     @default("High")                 // High | Medium | Low
+  interest      String     @default("High")                 // High | Medium | Low
+  side          String     @default("Client")               // Client | Delivery | Observer
+  dataOwner     Boolean    @default(false)
+  riskLevel     String     @default("Medium")               // Low | Medium | High
+  notes         String?    @db.Text
 
-  fullName     String
-  email        String
-  organization String                              // Regio Bank, QualiZeal, etc.
-  role         String                              // Executive Sponsor, CISO, etc.
-  influence    String     @default("High")        // High / Medium / Low
-  interest     String     @default("High")        // High / Medium / Low
-  side         String     @default("Client")      // Client / Delivery / Observer
-  phone        String?
-  notes        String?    @db.Text
-
-  createdById  String
-  createdBy    User       @relation("StakeholderCreator", fields: [createdById], references: [id])
-
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdById   String
+  createdBy     User       @relation("StakeholderCreator", fields: [createdById], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@index([engagementId])
-  @@index([createdById])
+}
+
+model TeamMember {
+  id            String     @id @default(cuid())
+  engagementId  String
+  engagement    Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User       @relation(fields: [userId], references: [id])
+  roleCode      String                                       // FK → Role.code
+  access        String     @default("Editor")                 // Owner | Editor | Viewer | Gate approver | Quality Assurance approver
+  organization  String                                        // denormalized: QualiZeal vs client name
+  addedAt       DateTime   @default(now())
+  removedAt     DateTime?
+
+  @@unique([engagementId, userId, roleCode])
+  @@index([engagementId])
+}
+
+/* ---------- Method Catalog (read-only from admin) ---------- */
+model MethodTemplate {
+  code      String  @id          // T-A1 ... T-G3
+  folder    String                // A | B | C | D | E | F | G
+  title     String
+  phase     Int                   // 1..4 or 0
+  purpose   String  @db.Text
+  isManaged Boolean @default(true)
 }
